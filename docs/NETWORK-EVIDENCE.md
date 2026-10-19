@@ -245,6 +245,24 @@ The following router screenshots were captured immediately after the routers wer
 
 **Purpose:** Records the Kelly router's post-restart configuration for comparison with the intended network baseline.
 
+### Full LAN Connectivity Verification
+
+- **Test source:** PAM-HQ-PC (`10.10.10.10`)
+- **Test method:** ICMP ping from the GNS3 VPCS console
+- **Result:** PASS — all five endpoint addresses responded to two consecutive ping requests.
+
+| Destination | Network | Result |
+|---|---|---|
+| `10.10.10.1` | HQ Users gateway | PASS |
+| `10.10.20.10` | HQ Servers | PASS |
+| `10.10.99.10` | Management | PASS |
+| `10.20.10.10` | Stanley Branch | PASS |
+| `10.30.10.10` | Kelly Branch | PASS |
+
+**Evidence:** `../evidence/connectivity/PAM-HQ-ALL-LAN-CONNECTIVITY.png`
+
+**Scope:** This verifies connectivity from PAM-HQ-PC to the listed destinations at the time of testing. It does not independently verify every source-to-destination combination or Windows-host reachability.
+
 ## 9. Findings and Design Decisions
 
 - The lab contains seven IP networks: five LAN subnets and two router-to-router transit subnets.
