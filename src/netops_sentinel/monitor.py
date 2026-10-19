@@ -1,8 +1,10 @@
-﻿"""Read-only IPv4 reachability monitoring for NetOps Sentinel."""
+﻿
+"""Read-only IPv4 reachability monitoring for NetOps Sentinel."""
 
 import ipaddress
 import json
 import logging
+import platform
 import subprocess
 import sys
 import time
@@ -61,10 +63,12 @@ def load_endpoints():
                 f"Only IPv4 endpoints are supported: {name} ({address})"
             )
 
-        validated.append({
-            "name": str(name),
-            "ip_address": str(parsed_address),
-        })
+        validated.append(
+            {
+                "name": str(name),
+                "ip_address": str(parsed_address),
+            }
+        )
 
     return validated
 
@@ -77,8 +81,10 @@ def check_endpoint(endpoint, timeout_ms=1000):
         result = subprocess.run(
             [
                 "ping",
-                "-n", "1",
-                "-w", str(timeout_ms),
+                "-n",
+                "1",
+                "-w",
+                str(timeout_ms),
                 endpoint["ip_address"],
             ],
             capture_output=True,
@@ -95,7 +101,9 @@ def check_endpoint(endpoint, timeout_ms=1000):
         return {
             "name": endpoint["name"],
             "ip_address": endpoint["ip_address"],
-            "status": "reachable" if result.returncode == 0 else "unreachable",
+            "status": (
+                "reachable" if result.returncode == 0 else "unreachable"
+            ),
             "duration_ms": duration_ms,
             "return_code": result.returncode,
             "output": (result.stdout or result.stderr).strip()[-1500:],
@@ -127,6 +135,7 @@ def check_endpoint(endpoint, timeout_ms=1000):
 
 
 def main():
+    """Run endpoint checks and save a timestamped JSON report."""
     RUNS_DIR.mkdir(parents=True, exist_ok=True)
     LOG_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -151,19 +160,30 @@ def main():
     reachable = sum(
         result["status"] == "reachable" for result in results
     )
+    not_reachable = len(results) - reachable
 
     report = {
         "project": "NetOps Sentinel",
         "started_at": started_at.isoformat(),
         "finished_at": finished_at.isoformat(),
         "monitoring_mode": "read-only",
+        "monitoring_host": platform.node(),
+        "monitoring_platform": platform.system(),
+        "probe_type": "ICMPv4",
+        "interpretation_note": (
+            "A failed ICMP probe may indicate endpoint unavailability, "
+            "ICMP filtering, or a missing route from the monitoring host. "
+            "A failed probe alone does not prove the endpoint is down."
+        ),
         "targets_checked": len(results),
         "reachable": reachable,
-        "not_reachable": len(results) - reachable,
+        "not_reachable": not_reachable,
         "results": results,
     }
 
-    filename = started_at.strftime("reachability-%Y%m%dT%H%M%SZ.json")
+    filename = started_at.strftime(
+        "reachability-%Y%m%dT%H%M%SZ.json"
+    )
     report_path = RUNS_DIR / filename
 
     try:
@@ -192,16 +212,24 @@ def main():
             f'{result["duration_ms"]:>8} ms'
         )
 
-    print(f"\nTargets checked: {len(results)}")
+    print(f"\nMonitoring host: {platform.node()}")
+    print(f"Platform: {platform.system()}")
+    print(f"Probe type: ICMPv4")
+    print(f"Targets checked: {len(results)}")
     print(f"Reachable: {reachable}")
-    print(f"Not reachable: {len(results) - reachable}")
+    print(f"Not reachable: {not_reachable}")
+    print(
+        "Note: Failed probes may indicate routing or ICMP filtering, "
+        "not only endpoint failure."
+    )
     print(f"Report: {report_path.relative_to(PROJECT_ROOT)}")
     print("Log: logs/netops-sentinel.log")
 
     logging.info(
-        "Monitoring run complete: checked=%d reachable=%d",
+        "Monitoring run complete: checked=%d reachable=%d not_reachable=%d",
         len(results),
         reachable,
+        not_reachable,
     )
 
     return 0 if reachable == len(results) else 1
