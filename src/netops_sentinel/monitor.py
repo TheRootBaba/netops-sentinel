@@ -1,9 +1,9 @@
-﻿
-"""Read-only IPv4 reachability monitoring for NetOps Sentinel."""
+﻿"""Read-only IPv4 reachability monitoring for NetOps Sentinel."""
 
 import ipaddress
 import json
 import logging
+import math
 import platform
 import subprocess
 import sys
@@ -23,10 +23,11 @@ def load_endpoints():
     with INVENTORY_FILE.open("r", encoding="utf-8-sig") as file:
         inventory = json.load(file)
 
-    if isinstance(inventory, dict):
-        endpoints = inventory.get("endpoints")
-    else:
-        endpoints = inventory
+    endpoints = (
+        inventory.get("endpoints")
+        if isinstance(inventory, dict)
+        else inventory
+    )
 
     if not isinstance(endpoints, list) or not endpoints:
         raise ValueError(
@@ -34,6 +35,7 @@ def load_endpoints():
         )
 
     validated = []
+    seen_names = set()
 
     for endpoint in endpoints:
         if not isinstance(endpoint, dict):
@@ -51,6 +53,13 @@ def load_endpoints():
                 f"Endpoint is missing a name or IP address: {endpoint}"
             )
 
+        name = str(name).strip()
+        if not name:
+            raise ValueError("Endpoint names cannot be empty.")
+
+        if name in seen_names:
+            raise ValueError(f"Duplicate endpoint name: {name}")
+
         try:
             parsed_address = ipaddress.ip_address(address)
         except ValueError as exc:
@@ -64,29 +73,47 @@ def load_endpoints():
             )
 
         validated.append(
-            {
-                "name": str(name),
-                "ip_address": str(parsed_address),
-            }
+            {"name": name, "ip_address": str(parsed_address)}
         )
+        seen_names.add(name)
 
     return validated
 
 
+def build_ping_command(ip_address, timeout_ms):
+    """Build a bounded ping command for the current operating system."""
+    if platform.system().lower() == "windows":
+        return [
+            "ping",
+            "-n",
+            "1",
+            "-w",
+            str(timeout_ms),
+            ip_address,
+        ]
+
+    timeout_seconds = max(1, math.ceil(timeout_ms / 1000))
+    return [
+        "ping",
+        "-n",
+        "-c",
+        "1",
+        "-W",
+        str(timeout_seconds),
+        ip_address,
+    ]
+
+
 def check_endpoint(endpoint, timeout_ms=1000):
-    """Perform one bounded Windows ping without invoking a shell."""
+    """Perform one bounded ping without invoking a shell."""
     started = time.perf_counter()
+    command = build_ping_command(
+        endpoint["ip_address"], timeout_ms
+    )
 
     try:
         result = subprocess.run(
-            [
-                "ping",
-                "-n",
-                "1",
-                "-w",
-                str(timeout_ms),
-                endpoint["ip_address"],
-            ],
+            command,
             capture_output=True,
             text=True,
             timeout=(timeout_ms / 1000) + 3,
@@ -172,7 +199,7 @@ def main():
         "probe_type": "ICMPv4",
         "interpretation_note": (
             "A failed ICMP probe may indicate endpoint unavailability, "
-            "ICMP filtering, or a missing route from the monitoring host. "
+            "ICMP filtering, or a routing issue from the monitoring host. "
             "A failed probe alone does not prove the endpoint is down."
         ),
         "targets_checked": len(results),
@@ -204,7 +231,6 @@ def main():
             result["status"],
             result["duration_ms"],
         )
-
         print(
             f'{result["name"]:<24} '
             f'{result["ip_address"]:<15} '
@@ -214,14 +240,10 @@ def main():
 
     print(f"\nMonitoring host: {platform.node()}")
     print(f"Platform: {platform.system()}")
-    print(f"Probe type: ICMPv4")
+    print("Probe type: ICMPv4")
     print(f"Targets checked: {len(results)}")
     print(f"Reachable: {reachable}")
     print(f"Not reachable: {not_reachable}")
-    print(
-        "Note: Failed probes may indicate routing or ICMP filtering, "
-        "not only endpoint failure."
-    )
     print(f"Report: {report_path.relative_to(PROJECT_ROOT)}")
     print("Log: logs/netops-sentinel.log")
 
