@@ -1,0 +1,9 @@
+﻿{
+  "schema_version": 1,
+  "interfaces": [
+    {"id": "michael-stanley-michael", "device_id": "michael-scott-core", "network_id": "michael-stanley-transit", "ip": "10.255.0.1/30", "peer_device_id": "stanley-branch-r1", "interface_name": null},
+    {"id": "michael-stanley-stanley", "device_id": "stanley-branch-r1", "network_id": "michael-stanley-transit", "ip": "10.255.0.2/30", "peer_device_id": "michael-scott-core", "interface_name": null},
+    {"id": "stanley-kelly-stanley", "device_id": "stanley-branch-r1", "network_id": "stanley-kelly-transit", "ip": "10.255.0.5/30", "peer_device_id": "kelly-branch-r1", "interface_name": null},
+    {"id": "stanley-kelly-kelly", "device_id": "kelly-branch-r1", "network_id": "stanley-kelly-transit", "ip": "10.255.0.6/30", "peer_device_id": "stanley-branch-r1", "interface_name": null}
+  ]
+}

@@ -1,0 +1,13 @@
+﻿{
+  "schema_version": 1,
+  "devices": [
+    {"id": "michael-scott-core", "name": "MICHAEL-SCOTT-CORE", "role": "core_router", "platform": "FRRouting 10.6.2", "site": "HQ"},
+    {"id": "stanley-branch-r1", "name": "STANLEY-BRANCH-R1", "role": "branch_router", "platform": "FRRouting 10.6.2", "site": "Stanley Branch"},
+    {"id": "kelly-branch-r1", "name": "KELLY-BRANCH-R1", "role": "branch_router", "platform": "FRRouting 10.6.2", "site": "Kelly Branch"},
+    {"id": "jim-pam-users-sw", "name": "JIM-PAM-USERS-SW", "role": "switch", "platform": "GNS3 switch node", "site": "HQ"},
+    {"id": "dwight-servers-sw", "name": "DWIGHT-SERVERS-SW", "role": "switch", "platform": "GNS3 switch node", "site": "HQ"},
+    {"id": "creed-mgmt-sw", "name": "CREED-MGMT-SW", "role": "switch", "platform": "GNS3 switch node", "site": "HQ"},
+    {"id": "stanley-branch-sw", "name": "STANLEY-BRANCH-SW", "role": "switch", "platform": "GNS3 switch node", "site": "Stanley Branch"},
+    {"id": "kelly-branch-sw", "name": "KELLY-BRANCH-SW", "role": "switch", "platform": "GNS3 switch node", "site": "Kelly Branch"}
+  ]
+}

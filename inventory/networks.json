@@ -1,0 +1,12 @@
+﻿{
+  "schema_version": 1,
+  "networks": [
+    {"id": "hq-users", "name": "HQ Users", "cidr": "10.10.10.0/24", "gateway": "10.10.10.1", "purpose": "user_lan"},
+    {"id": "hq-servers", "name": "HQ Servers", "cidr": "10.10.20.0/24", "gateway": "10.10.20.1", "purpose": "server_lan"},
+    {"id": "management", "name": "Management", "cidr": "10.10.99.0/24", "gateway": "10.10.99.1", "purpose": "management_lan"},
+    {"id": "stanley-branch-lan", "name": "Stanley Branch LAN", "cidr": "10.20.10.0/24", "gateway": "10.20.10.1", "purpose": "user_lan"},
+    {"id": "kelly-branch-lan", "name": "Kelly Branch LAN", "cidr": "10.30.10.0/24", "gateway": "10.30.10.1", "purpose": "user_lan"},
+    {"id": "michael-stanley-transit", "name": "Michael-Stanley Transit", "cidr": "10.255.0.0/30", "purpose": "transit"},
+    {"id": "stanley-kelly-transit", "name": "Stanley-Kelly Transit", "cidr": "10.255.0.4/30", "purpose": "transit"}
+  ]
+}

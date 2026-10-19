@@ -1,0 +1,15 @@
+﻿{
+  "schema_version": 1,
+  "routing_protocols": ["static"],
+  "live_configuration_verified": false,
+  "routers": [
+    {"device_id": "michael-scott-core", "static_routes": []},
+    {"device_id": "stanley-branch-r1", "static_routes": []},
+    {"device_id": "kelly-branch-r1", "static_routes": []}
+  ],
+  "notes": [
+    "Static routing is the current user-reported baseline.",
+    "Populate route destinations and next hops after collecting current FRR route output.",
+    "Do not configure OSPF or change router configuration during inventory setup."
+  ]
+}
