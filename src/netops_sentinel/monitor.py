@@ -92,7 +92,8 @@ def build_ping_command(ip_address, timeout_ms):
             ip_address,
         ]
 
-    timeout_seconds = max(1, math.ceil(timeout_ms / 1000))
+    # BusyBox/Linux ping may need longer than one second in GNS3.
+    timeout_seconds = max(3, math.ceil(timeout_ms / 1000))
     return [
         "ping",
         "-n",
@@ -111,12 +112,19 @@ def check_endpoint(endpoint, timeout_ms=1000):
         endpoint["ip_address"], timeout_ms
     )
 
+    # Match the Linux ping wait time while retaining an outer safety limit.
+    process_timeout = (
+        max(3, math.ceil(timeout_ms / 1000)) + 3
+        if platform.system().lower() != "windows"
+        else (timeout_ms / 1000) + 3
+    )
+
     try:
         result = subprocess.run(
             command,
             capture_output=True,
             text=True,
-            timeout=(timeout_ms / 1000) + 3,
+            timeout=process_timeout,
             check=False,
             shell=False,
         )
