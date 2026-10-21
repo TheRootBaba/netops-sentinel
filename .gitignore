@@ -1,12 +1,23 @@
-﻿.venv/
+﻿# Python environments and generated files
+.venv/
 __pycache__/
 *.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local secrets and runtime output
 .env
 .env.*
 !.env.example
 logs/
-evidence/runs/
-evidence/config-backups/
+*.log
 node_modules/
 dashboard/dist/
-*.log
+
+# Monitoring output and configuration backups
+evidence/runs/
+evidence/config-backups/
