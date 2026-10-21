@@ -1,10 +1,12 @@
-﻿"""Read-only IPv4 reachability monitoring for NetOps Sentinel."""
+﻿
+"""Read-only IPv4 reachability monitoring for NetOps Sentinel."""
 
 import ipaddress
 import json
 import logging
 import math
 import platform
+import re
 import subprocess
 import sys
 import time
@@ -16,6 +18,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 INVENTORY_FILE = PROJECT_ROOT / "inventory" / "endpoints.json"
 RUNS_DIR = PROJECT_ROOT / "evidence" / "runs"
 LOG_DIR = PROJECT_ROOT / "logs"
+
+PING_COUNT = 3
+PING_TIMEOUT_MS = 1000
 
 
 def load_endpoints():
@@ -80,44 +85,80 @@ def load_endpoints():
     return validated
 
 
-def build_ping_command(ip_address, timeout_ms):
-    """Build a bounded ping command for the current operating system."""
+def build_ping_command(ip_address, timeout_ms, count=PING_COUNT):
+    """Build a bounded multi-ping command for Windows or Linux."""
     if platform.system().lower() == "windows":
         return [
             "ping",
             "-n",
-            "1",
+            str(count),
             "-w",
             str(timeout_ms),
             ip_address,
         ]
 
-    # BusyBox/Linux ping may need longer than one second in GNS3.
+    # BusyBox/Linux ping needs a sufficiently long per-packet timeout in GNS3.
     timeout_seconds = max(3, math.ceil(timeout_ms / 1000))
     return [
         "ping",
         "-n",
         "-c",
-        "1",
+        str(count),
         "-W",
         str(timeout_seconds),
         ip_address,
     ]
 
 
-def check_endpoint(endpoint, timeout_ms=1000):
-    """Perform one bounded ping without invoking a shell."""
-    started = time.perf_counter()
-    command = build_ping_command(
-        endpoint["ip_address"], timeout_ms
+def parse_ping_output(output, return_code):
+    """Extract packet statistics from common Windows/Linux ping output."""
+    sent = received = None
+
+    # Linux and BusyBox: "3 packets transmitted, 2 packets received"
+    match = re.search(
+        r"(\d+)\s+packets transmitted,\s*(\d+)\s+"
+        r"(?:packets )?received",
+        output,
+        re.IGNORECASE,
     )
 
-    # Match the Linux ping wait time while retaining an outer safety limit.
-    process_timeout = (
-        max(3, math.ceil(timeout_ms / 1000)) + 3
-        if platform.system().lower() != "windows"
-        else (timeout_ms / 1000) + 3
+    if match:
+        sent = int(match.group(1))
+        received = int(match.group(2))
+    else:
+        # Windows: "Packets: Sent = 3, Received = 2, Lost = 1"
+        match = re.search(
+            r"Sent\s*=\s*(\d+).*?Received\s*=\s*(\d+)",
+            output,
+            re.IGNORECASE | re.DOTALL,
+        )
+        if match:
+            sent = int(match.group(1))
+            received = int(match.group(2))
+
+    if sent is None:
+        sent = PING_COUNT
+    if received is None:
+        # A successful ping exit code indicates at least one reply.
+        received = 1 if return_code == 0 else 0
+
+    return sent, received
+
+
+def check_endpoint(endpoint, timeout_ms=PING_TIMEOUT_MS):
+    """Probe an endpoint multiple times without invoking a shell."""
+    started = time.perf_counter()
+    command = build_ping_command(
+        endpoint["ip_address"], timeout_ms, PING_COUNT
     )
+
+    if platform.system().lower() == "windows":
+        process_timeout = (
+            PING_COUNT * timeout_ms / 1000
+        ) + 5
+    else:
+        per_ping_timeout = max(3, math.ceil(timeout_ms / 1000))
+        process_timeout = PING_COUNT * per_ping_timeout + 3
 
     try:
         result = subprocess.run(
@@ -132,16 +173,26 @@ def check_endpoint(endpoint, timeout_ms=1000):
         duration_ms = round(
             (time.perf_counter() - started) * 1000, 2
         )
+        output = (result.stdout or result.stderr).strip()
+        sent, received = parse_ping_output(output, result.returncode)
+
+        if received > 0 or result.returncode == 0:
+            status = "reachable"
+        else:
+            status = "unreachable"
 
         return {
             "name": endpoint["name"],
             "ip_address": endpoint["ip_address"],
-            "status": (
-                "reachable" if result.returncode == 0 else "unreachable"
-            ),
+            "status": status,
             "duration_ms": duration_ms,
+            "probes_sent": sent,
+            "probes_received": received,
+            "packet_loss_percent": round(
+                max(0, sent - received) / sent * 100, 2
+            ) if sent else None,
             "return_code": result.returncode,
-            "output": (result.stdout or result.stderr).strip()[-1500:],
+            "output": output[-1500:],
         }
 
     except subprocess.TimeoutExpired:
@@ -152,6 +203,9 @@ def check_endpoint(endpoint, timeout_ms=1000):
             "duration_ms": round(
                 (time.perf_counter() - started) * 1000, 2
             ),
+            "probes_sent": PING_COUNT,
+            "probes_received": 0,
+            "packet_loss_percent": 100.0,
             "return_code": None,
             "output": "Ping process exceeded its time limit.",
         }
@@ -164,6 +218,9 @@ def check_endpoint(endpoint, timeout_ms=1000):
             "duration_ms": round(
                 (time.perf_counter() - started) * 1000, 2
             ),
+            "probes_sent": 0,
+            "probes_received": 0,
+            "packet_loss_percent": None,
             "return_code": None,
             "output": str(exc),
         }
@@ -205,10 +262,16 @@ def main():
         "monitoring_host": platform.node(),
         "monitoring_platform": platform.system(),
         "probe_type": "ICMPv4",
+        "probe_count_per_endpoint": PING_COUNT,
+        "success_policy": (
+            "Reachable if at least one of the configured ICMP probes "
+            "receives a reply."
+        ),
         "interpretation_note": (
             "A failed ICMP probe may indicate endpoint unavailability, "
-            "ICMP filtering, or a routing issue from the monitoring host. "
-            "A failed probe alone does not prove the endpoint is down."
+            "ICMP filtering, packet loss, or a routing issue from the "
+            "monitoring host. A failed probe alone does not prove the "
+            "endpoint is down."
         ),
         "targets_checked": len(results),
         "reachable": reachable,
@@ -233,22 +296,29 @@ def main():
 
     for result in results:
         logging.info(
-            "endpoint=%s ip=%s status=%s duration_ms=%s",
+            "endpoint=%s ip=%s status=%s probes=%s/%s loss_percent=%s "
+            "duration_ms=%s",
             result["name"],
             result["ip_address"],
             result["status"],
+            result["probes_received"],
+            result["probes_sent"],
+            result["packet_loss_percent"],
             result["duration_ms"],
         )
         print(
             f'{result["name"]:<24} '
             f'{result["ip_address"]:<15} '
             f'{result["status"]:<12} '
+            f'{result["probes_received"]}/{result["probes_sent"]} replies '
+            f'({result["packet_loss_percent"]}% loss) '
             f'{result["duration_ms"]:>8} ms'
         )
 
     print(f"\nMonitoring host: {platform.node()}")
     print(f"Platform: {platform.system()}")
     print("Probe type: ICMPv4")
+    print(f"Probes per endpoint: {PING_COUNT}")
     print(f"Targets checked: {len(results)}")
     print(f"Reachable: {reachable}")
     print(f"Not reachable: {not_reachable}")
@@ -256,7 +326,8 @@ def main():
     print("Log: logs/netops-sentinel.log")
 
     logging.info(
-        "Monitoring run complete: checked=%d reachable=%d not_reachable=%d",
+        "Monitoring run complete: checked=%d reachable=%d "
+        "not_reachable=%d",
         len(results),
         reachable,
         not_reachable,
