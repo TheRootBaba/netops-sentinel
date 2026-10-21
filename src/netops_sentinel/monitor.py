@@ -1,5 +1,4 @@
 ﻿
-"""Read-only IPv4 reachability monitoring for NetOps Sentinel."""
 
 import ipaddress
 import json
@@ -97,7 +96,7 @@ def build_ping_command(ip_address, timeout_ms, count=PING_COUNT):
             ip_address,
         ]
 
-    # BusyBox/Linux ping needs a sufficiently long per-packet timeout in GNS3.
+    
     timeout_seconds = max(3, math.ceil(timeout_ms / 1000))
     return [
         "ping",
@@ -114,7 +113,7 @@ def parse_ping_output(output, return_code):
     """Extract packet statistics from common Windows/Linux ping output."""
     sent = received = None
 
-    # Linux and BusyBox: "3 packets transmitted, 2 packets received"
+    
     match = re.search(
         r"(\d+)\s+packets transmitted,\s*(\d+)\s+"
         r"(?:packets )?received",
@@ -126,7 +125,7 @@ def parse_ping_output(output, return_code):
         sent = int(match.group(1))
         received = int(match.group(2))
     else:
-        # Windows: "Packets: Sent = 3, Received = 2, Lost = 1"
+        
         match = re.search(
             r"Sent\s*=\s*(\d+).*?Received\s*=\s*(\d+)",
             output,
@@ -139,7 +138,7 @@ def parse_ping_output(output, return_code):
     if sent is None:
         sent = PING_COUNT
     if received is None:
-        # A successful ping exit code indicates at least one reply.
+        
         received = 1 if return_code == 0 else 0
 
     return sent, received

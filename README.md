@@ -25,5 +25,3 @@ $env:PYTHONPATH = "$PWD\src"
 Remove-Item Env:\PYTHONPATH
 ```
 
-## Safety
-Initial monitoring will be read-only. Router configuration changes will require a separate plan, backup, approval, verification and rollback procedure.
