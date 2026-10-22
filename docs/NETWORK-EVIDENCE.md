@@ -9,10 +9,10 @@
 | Virtualization platform | GNS3 2.2.61 |
 | Router platform | FRRouting 10.6.2 |
 | Host operating system | Windows 11 |
-| Routing method | Static routing |
+| Routing method | Static routing & ospf later|
 | Network status | Operational baseline |
 | Evidence date | October 19, 2026 |
-
+| you should double-check every configuration to see if it matches |
 ## 2. Purpose
 
 This document provides the technical record of the NetOps Sentinel network lab. It documents the topology, router configurations, endpoint addressing, connectivity testing, and configuration persistence.
